@@ -80,7 +80,7 @@ async def create_room(user:User):
   room_id = ''.join(randlst)
   try:
     await manager.create_room(room_id, user.user_name)
-    print("稼働中のroomを確認",manager.active_room)
+    print("Create:稼働中のroomを確認",manager.active_room)
     return {"room_id":room_id}
   except:
     return {"error":"ルーム作成に失敗しました"}
@@ -91,6 +91,7 @@ class Entry(BaseModel):
 
 @app.post("/entry")
 async def entry(entry:Entry):
+  print("Entry:稼働中のroomを確認",manager.active_room)
   await manager.entry(entry.room_id, entry.user_name)
   return {"success":"部屋に入ります"}
 
