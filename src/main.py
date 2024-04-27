@@ -29,7 +29,7 @@ class ConnectionManager:
         print("アクティブユーザーを追加しました。")
 
     def disconnect(self, client_name: str) -> None:
-        print("接続を切るものを確認", self.active_connections)
+        print("接続切断を確認", self.active_connections)
         self.active_connections.pop(client_name)
 
     async def send_personal_message(self, message: str, client_name: str) -> None:
@@ -40,7 +40,9 @@ class ConnectionManager:
     #         await connection.send_text(message)
     
     async def multicast(self, room_id: str, client_name: str, message: str) -> None:
+      print("アクティブユーザーを確認",self.active_connections)
       for name in self.active_room[room_id]:
+        print("送るユーザーを確認：",name)
         await self.active_connections[name].send_json({"user_name":client_name, "message":message})
     
     async def create_room(self, room_id: str, host_name) -> None:
