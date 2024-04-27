@@ -26,6 +26,7 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket, client_name: str) -> None:
         await websocket.accept()
         self.active_connections[client_name] = websocket
+        print("アクティブユーザーを追加しました。")
 
     def disconnect(self, client_name: str) -> None:
         print("接続を切るものを確認", self.active_connections)
@@ -43,13 +44,19 @@ class ConnectionManager:
         await self.active_connections[name].send_json({"user_name":client_name, "message":message})
     
     async def create_room(self, room_id: str, host_name) -> None:
+      print("ルームを作成します")
       self.active_room[room_id] = [host_name]
+      print("ルームが作成されました。")
+      print("Created:稼働中のroomを確認",self.active_room)
 
     async def delete_room(self, room_id):
       self.active_room.pop(room_id)
     
     async def entry(self, room_id: str, client_name: str) -> None:
+      print("ルームに入ります")
       self.active_room[room_id].append(client_name)
+      print("ルームに入りました。")
+      print("Entried:稼働中のroomを確認",self.active_room)
 
     async def exit(self, room_id:str, client_name: str):
       self.disconnect(client_name)
