@@ -80,6 +80,7 @@ async def create_room(user:User):
   room_id = ''.join(randlst)
   try:
     await manager.create_room(room_id, user.user_name)
+    print("稼働中のroomを確認",manager.active_room)
     return {"room_id":room_id}
   except:
     return {"error":"ルーム作成に失敗しました"}
