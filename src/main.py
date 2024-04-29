@@ -20,54 +20,58 @@ rds = redis.Redis(host='redis-10873.c44.us-east-1-2.ec2.redns.redis-cloud.com', 
 
 active_connections: dict[str, WebSocket] = {}
 
-async def connect( websocket: WebSocket, client_name: str) -> None:
-    await websocket.accept()
-    active_connections[client_name] = websocket
+class ConnectionManager:
 
-def disconnect( client_name: str) -> None:
-    print("接続を切るものを確認", active_connections)
-    active_connections.pop(client_name)
+    async def connect(self, websocket: WebSocket, client_name: str) -> None:
+        await websocket.accept()
+        self.active_connections[client_name] = websocket
 
-async def send_personal_message( message: str, client_name: str) -> None:
-    await active_connections[client_name].send_text(message)
+    def disconnect(self, client_name: str) -> None:
+        print("接続を切るものを確認", self.active_connections)
+        self.active_connections.pop(client_name)
 
-# async def broadcast( room_id: str) -> None:
-#     for connection in active_connections:
-#         await connection.send_text(message)
+    async def send_personal_message(self, message: str, client_name: str) -> None:
+        await self.active_connections[client_name].send_text(message)
 
-async def multicast( room_id: str, client_name: str, message: str) -> None:
-  room_list = rds.lrange(room_id, 0, -1)
-  for name in room_list:
-    await active_connections[name].send_json({"user_name":client_name, "message":message})
+    # async def broadcast(self, room_id: str) -> None:
+    #     for connection in self.active_connections:
+    #         await connection.send_text(message)
+    
+    async def multicast(self, room_id: str, client_name: str, message: str) -> None:
+      room_list = rds.lrange(room_id, 0, -1)
+      for name in room_list:
+        await self.active_connections[name].send_json({"user_name":client_name, "message":message})
+    
+    async def create_room(self, room_id: str, host_name) -> None:
+      print(room_id)
+      rds.rpush(room_id, host_name)
+      print("作成終了")
 
-async def create_room( room_id: str, host_name) -> None:
-  print(room_id)
-  rds.rpush(room_id, host_name)
-  print("作成終了")
+    async def delete_room(self, room_id):
+      self.active_room.pop(room_id)
+    
+    async def entry(self, room_id: str, client_name: str) -> None:
+      rds.rpush(room_id, client_name)
 
-async def delete_room( room_id):
-  active_room.pop(room_id)
+    async def exit(self, room_id:str, client_name: str):
+      self.disconnect(client_name)
+      rds.lrem(room_id, 1, client_name)
+      await self.multicast(room_id, "Game Master", f"{client_name}が退出しました")
 
-async def entry( room_id: str, client_name: str) -> None:
-  rds.rpush(room_id, client_name)
-
-async def exit( room_id:str, client_name: str):
-  disconnect(client_name)
-  rds.lrem(room_id, 1, client_name)
-  await multicast(room_id, "Game Master", f"{client_name}が退出しました")
+manager = ConnectionManager()
 
 @app.websocket("/ws/{client_name}/room/{room_id}")
 async def websocket_endpoint(websocket: WebSocket, client_name: str, room_id: str):
-    await connect(websocket, client_name)
+    await manager.connect(websocket, client_name)
     print("通信成功")
-    print("どのユーザーが接続しているかの確認",active_connections)
+    print("どのユーザーが接続しているかの確認",manager.active_connections)
     try:
         while True:
             data = await websocket.receive_text()
-            await send_personal_message(f"You wrote: {data}", websocket)
-            await broadcast(f"Client #{client_name} says: {data}")
+            await manager.send_personal_message(f"You wrote: {data}", websocket)
+            await manager.broadcast(f"Client #{client_name} says: {data}")
     except:
-        await exit(room_id, client_name)
+        await manager.exit(room_id, client_name)
 
 class User(BaseModel):
   user_name: str
@@ -77,7 +81,7 @@ async def create_room(user:User):
   randlst = [random.choice(string.ascii_letters + string.digits) for i in range(6)]
   room_id = ''.join(randlst)
   try:
-    await create_room(room_id, user.user_name)
+    await manager.create_room(room_id, user.user_name)
     return {"room_id":room_id}
   except:
     return {"error":"ルーム作成に失敗しました"}
@@ -88,7 +92,7 @@ class Entry(BaseModel):
 
 @app.post("/entry")
 async def entry(entry:Entry):
-  await entry(entry.room_id, entry.user_name)
+  await manager.entry(entry.room_id, entry.user_name)
   return {"success":"部屋に入ります"}
 
 class Msg(BaseModel):
@@ -98,7 +102,7 @@ class Msg(BaseModel):
 
 @app.post("/msg")
 async def send_message(msg:Msg):
-  await multicast(msg.room_id, msg.user_name, msg.message)
+  await manager.multicast(msg.room_id, msg.user_name, msg.message)
   return 0
 
 @app.post("/redis_get")
