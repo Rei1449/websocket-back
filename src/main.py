@@ -18,9 +18,9 @@ app.add_middleware(
 
 rds = redis.Redis(host='redis-10873.c44.us-east-1-2.ec2.redns.redis-cloud.com', port=10873, password='qFhyU0rV9a75D9jJCq5NjN7sZvM7jyuT', decode_responses=True)
 
-active_connections: dict[str, WebSocket] = {}
-
 class ConnectionManager:
+    def __init__(self):
+        self.active_connections: dict[str, WebSocket] = {}
 
     async def connect(self, websocket: WebSocket, client_name: str) -> None:
         await websocket.accept()
